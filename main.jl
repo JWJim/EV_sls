@@ -43,22 +43,48 @@ function poly_transform(state_data) # transform using sieve
     return full_state
 end
 
-function compress_state(eta) # empirical distribution
-    function check_S(S_self_1,S_self_2,S_oppo_1,S_oppo_2)
-        return func_D([S_self_1,S_self_2],[S_oppo_1,S_oppo_2]) .* (eta[1].+ eta[2].*S_self_1 .+ eta[3].*S_self_2 .+ eta[4].*S_oppo_1 .+ eta[5].*S_oppo_2)
+function compress_state() # empirical distribution
+    function check_S(eta,S)
+        S_self_1 = S[:,1]
+        S_self_2 = S[:,2]
+        S_oppo_1 = S[:,3]
+        S_oppo_2 = S[:,4]
+        return func_D.(eachrow(hcat(S_self_1,S_self_2)),eachrow(hcat(S_oppo_1,S_oppo_2))).*(eta[1].+ eta[2].*S_self_1.+eta[3].*S_self_2.+eta[4].*S_oppo_1.+eta[5].*S_oppo_2)
+    end
+
+    function obj(eta,data)
+        check_Sa = check_S(eta,hcat(data.sa1,data.sa2,data.sb1,data.sb2))
+        check_Sb = check_S(eta,hcat(data.sb1,data.sb2,data.sa1,data.sa2))
+        check_Sj = vcat(check_Sa,check_Sb)
+        xj1 = vcat(data.xa1,data.xb1)
+        xj2 = vcat(data.xa2,data.xb2)
+        norm_check_Sj = mean(check_Sj)
+        He_check_Sj = reduce(hcat,[basis(ChebyshevHermite,i).(check_Sj) for i in 0:4])
+        M_mat = I-He_check_Sj*pinv(He_check_Sj'*He_check_Sj)*He_check_Sj'
+        err1 = (M_mat*xj1).^2 .*(xj1.>0)
+        err2 = (M_mat*xj2).^2 .*(xj2.>0)
+        return mean(vcat(err1,err2))
     end
 
     data = CSV.read("generated_data.csv", DataFrame)
-    check_Sa = reduce(vcat,check_S.(eachrow(data.sa1),eachrow(data.sa2),eachrow(data.sb1),eachrow(data.sb2)))
-    check_Sb = reduce(vcat,check_S.(eachrow(data.sb1),eachrow(data.sb2),eachrow(data.sa1),eachrow(data.sa2)))
-    check_Sa_prime = reduce(vcat,check_S.(eachrow(data.sa1.+data.xa1),eachrow(data.sa2.+data.xa2),eachrow(data.sb1.+data.xb1),eachrow(data.sb2.+data.xb2)))
-    check_Sb_prime = reduce(vcat,check_S.(eachrow(data.sb1.+data.xb1),eachrow(data.sb2.+data.xb2),eachrow(data.sa1.+data.xa1),eachrow(data.sa2.+data.xa2)))
+    eta_init = [20.0,1.0,1.0,-0.5,-1.0]
+    eta_lower = [-20.0,-1.0,-1.0,-2.5,-3.0]
+    eta_upper = [40.0,2.0,2.0,0.5,1.0]
+    res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(LBFGS()),Optim.Options(x_tol=1e-8))
+    eta_opt = res.minimizer
+    
+
+    # calculate results
+    check_Sa = check_S(eta,hcat(data.sa1,data.sa2,data.sb1,data.sb2))
+    check_Sb = check_S(eta,hcat(data.sb1,data.sb2,data.sa1,data.sa2))
+    check_Sa_prime = check_S(eta,hcat(data.sa1.+data.xa1,data.sa2.+data.xa2,data.sb1.+data.xb1,data.sb2.+data.xb2)) 
+    check_Sb_prime = check_S(eta,hcat(data.sb1.+data.xb1,data.sb2.+data.xb2,data.sa1.+data.xa1,data.sa2.+data.xa2)) 
 
     gmin = min(findmin(check_Sa)[1],findmin(check_Sb)[1])
     gmax = max(findmax(check_Sa)[1],findmax(check_Sb)[1])
     lin_space = LinRange(gmin,gmax,51)
     axis = diff(lin_space)/2+lin_space[1:end-1]
-    return (data,check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,axis,gmax,gmin) #,weight
+    return (data,check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,axis,gmin,gmax) #,weight
 end
 
 function lom_reg(check_S_prime,check_S,x) # basic method for law of motion estimation
@@ -191,27 +217,9 @@ function func_eval_order2_avg(paras,S,pol_reg,pol_reg_alter,lom_coeff,gmax,gmin)
     return val'
 end
     
-function calc_T(paras,rndvec;return_full=true)
+function calc_T(paras,num_of_state,num_of_mkt,rndvec,S,gmin,gmax,lom_coeff,pol_reg,pol_reg_alter,pol_reg_jk;return_full=true)
     GC.gc()
-    @show eta = paras[5:end]
-    
-    (raw_data,check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,bas_x,gmax,gmin) = compress_state(eta) # ,state_weight
-    num_of_mkt = size(check_Sa)[1]
-    (pol_reg,pol_reg_alter) = policy_approx(raw_data,check_Sa,check_Sb)
-        
-     # conduct jack-knife
-    pol_reg_jk = zeros(num_of_mkt,size(pol_reg)...)
-    @threads for i in 1:num_of_mkt
-        pol_reg_jk[i,:,:] = policy_approx(raw_data,check_Sa,check_Sb;drop_index=i)
-    end
-    
-    state_data_check  = vcat(check_Sa,check_Sb)
-    choice_data = vcat(hcat(raw_data.xa1,raw_data.xa2,raw_data.xb1,raw_data.xb2),hcat(raw_data.xb1,raw_data.xb2,raw_data.xa1,raw_data.xa2))
-    state_data_prime_check = vcat(check_Sa_prime,check_Sb_prime)
-    lom_coeff = lom_reg(state_data_prime_check,state_data_check,choice_data)
-    
-    all_state = bas_x; S = bas_x
-    num_of_state = size(all_state)[1]
+    @show paras
     
     ## calculating Q_func
     val_0 = func_eval_order2_avg(paras,S,pol_reg,pol_reg,lom_coeff,gmax,gmin)
@@ -297,19 +305,37 @@ end
 
 function estimate_bbl()  # main procedure of estimation following CCK(2019)
     dt_temp = CSV.read("generated_data.csv", DataFrame)
-    num_of_mkt = size(dt_temp)[1]
-    rndvec = randn(num_of_bootstrap*2,num_of_mkt)
     paras_true = [2000.0,1000.0,100.0,50.0,20.0,1.0,1.0,-0.5,-1.0]
     paras_lower = paras_true .* eps()
     paras_upper = paras_true .* 2.0
     GC.gc()
 
+    (raw_data,check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,bas_x,gmin,gmax) = compress_state() # ,state_weight
+    num_of_mkt = size(check_Sa)[1]
+    (pol_reg,pol_reg_alter) = policy_approx(raw_data,check_Sa,check_Sb)
+        
+     # conduct jack-knife
+    pol_reg_jk = zeros(num_of_mkt,size(pol_reg)...)
+    @threads for i in 1:num_of_mkt
+        pol_reg_jk[i,:,:] = policy_approx(raw_data,check_Sa,check_Sb;drop_index=i)
+    end
+    
+    # calculate law of motion
+    state_data_check  = vcat(check_Sa,check_Sb)
+    choice_data = vcat(hcat(raw_data.xa1,raw_data.xa2,raw_data.xb1,raw_data.xb2),hcat(raw_data.xb1,raw_data.xb2,raw_data.xa1,raw_data.xa2))
+    state_data_prime_check = vcat(check_Sa_prime,check_Sb_prime)
+    lom_coeff = lom_reg(state_data_prime_check,state_data_check,choice_data)
+    
+    all_state = bas_x
+    num_of_state = size(all_state)[1]
+
+    rndvec = randn(num_of_bootstrap*2,num_of_mkt)
     calc_T(paras_true,rndvec,return_full=true)
     for i in 0.1:0.1:2.0
         GC.gc()
         paras_test = copy(paras_true) * i
         paras_test[5:7] = copy(paras_true)[5:7]
-        calc_T(paras_test,rndvec,return_full=true)
+        calc_T(paras_test,num_of_state,num_of_mkt,rndvec,all_state,gmin,gmax,lom_coeff,pol_reg,pol_reg_alter,pol_reg_jk,return_full=true)
     end
     return 0
 end
