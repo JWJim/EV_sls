@@ -98,37 +98,37 @@ function lom_pred(coeff,check_S,x)
     return x_poly*coeff
 end
 
-function tobit_reg(X,Y_mat)    # linear regression
-    function log_llh_trans(coeff,X,y)
-        rho   = coeff[size(X)[2]*2+1]
-        sigma = exp(coeff[size(X)[2]*2+2])
-        temp1 = (log.(y)-X*coeff[1:size(X)[2]])./sigma
-        temp2 = X*coeff[size(X)[2]+1:size(X)[2]*2] # Need to change this part to incorprate y
-        temp3 = temp_2 with an unknown eps term (equivalent to y)
-        if (abs(rho/sigma)>=1)
-            return Inf
-        else
-            log_lhd = (logpdf.(Normal(),temp1).-log(sigma)+logcdf.(Normal(),(temp2+rho/sigma*temp1)/sqrt(1-(rho/sigma)^2))).*(y.>0.0)
-            # int over eps_un, a standard normal distribution
-            + (pdf.(Normal(),eps_un)./sigma.*cdf.(Normal(),-(temp3+rho/sigma*eps_un)/sqrt(1-(rho/sigma)^2)))
+# function tobit_reg(X,Y_mat)    # linear regression
+#     function log_llh_trans(coeff,X,y)
+#         rho   = coeff[size(X)[2]*2+1]
+#         sigma = exp(coeff[size(X)[2]*2+2])
+#         temp1 = (log.(y)-X*coeff[1:size(X)[2]])./sigma
+#         temp2 = X*coeff[size(X)[2]+1:size(X)[2]*2] # Need to change this part to incorprate y
+#         temp3 = temp_2 with an unknown eps term (equivalent to y)
+#         if (abs(rho/sigma)>=1)
+#             return Inf
+#         else
+#             log_lhd = (logpdf.(Normal(),temp1).-log(sigma)+logcdf.(Normal(),(temp2+rho/sigma*temp1)/sqrt(1-(rho/sigma)^2))).*(y.>0.0)
+#             # int over eps_un, a standard normal distribution
+#             + (pdf.(Normal(),eps_un)./sigma.*cdf.(Normal(),-(temp3+rho/sigma*eps_un)/sqrt(1-(rho/sigma)^2)))
             
-            .*(y.<=0.0)
-            return - mean(log_lhd)
-        end
-    end
+#             .*(y.<=0.0)
+#             return - mean(log_lhd)
+#         end
+#     end
 
-    xx = poly_transform(X)
-    coeff_mat = zeros((size(xx)[2]*2+2,size(Y_mat)[2]))
-    final_llh = zeros(size(Y_mat)[2])
-    for i in 1:size(Y_mat)[2]
-        yy = Y_mat[:,i]
-        c_init = vcat(xx[yy.>0,:]\log.(yy[yy.>0]),xx\((yy.>0).-0.5),[0.0,0.0])
-        res = optimize(c->log_llh_trans(c,xx,yy),c_init,NelderMead(),Optim.Options(x_tol=1e-8))
-        coeff_mat[:,i] = res.minimizer
-        final_llh[i] = -res.minimum
-    end
-    return (coeff_mat,final_llh)
-end
+#     xx = poly_transform(X)
+#     coeff_mat = zeros((size(xx)[2]*2+2,size(Y_mat)[2]))
+#     final_llh = zeros(size(Y_mat)[2])
+#     for i in 1:size(Y_mat)[2]
+#         yy = Y_mat[:,i]
+#         c_init = vcat(xx[yy.>0,:]\log.(yy[yy.>0]),xx\((yy.>0).-0.5),[0.0,0.0])
+#         res = optimize(c->log_llh_trans(c,xx,yy),c_init,NelderMead(),Optim.Options(x_tol=1e-8))
+#         coeff_mat[:,i] = res.minimizer
+#         final_llh[i] = -res.minimum
+#     end
+#     return (coeff_mat,final_llh)
+# end
 
 function tobit_pred(X,coeff_mat)  # linear prediction
     xx = poly_transform(X)
