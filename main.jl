@@ -1,5 +1,5 @@
 using Timers,Random,Sobol
-using Dates
+using Dates,Revise
 # Random.seed!(Dates.today() |> Dates.value)
 # using QuantEcon
 # Pkg.add(["Polynomials","SpecialPolynomials","Distributions","Statistics","StatsBase"])
@@ -10,6 +10,7 @@ using Optim,Distributions,Statistics,StatsBase
 using Base.Threads
 using CompEcon
 using Serialization
+using KernelEstimator
 # using Plots
 ## globals
 include("gendata.jl") # data generating process
@@ -58,11 +59,10 @@ function compress_state() # empirical distribution
         check_Sj = vcat(check_Sa,check_Sb)
         xj1 = vcat(data.xa1,data.xb1)
         xj2 = vcat(data.xa2,data.xb2)
-        norm_check_Sj = mean(check_Sj)
-        He_check_Sj = reduce(hcat,[basis(ChebyshevHermite,i).(check_Sj) for i in 0:4])
-        M_mat = I-He_check_Sj*pinv(He_check_Sj'*He_check_Sj)*He_check_Sj'
-        err1 = (M_mat*xj1).^2 .*(xj1.>0)
-        err2 = (M_mat*xj2).^2 .*(xj2.>0)
+        xj1_fit = npr(check_Sj, xj1, reg=locallinear, kernel=gaussiankernel)
+        xj2_fit = npr(check_Sj, xj2, reg=locallinear, kernel=gaussiankernel)
+        err1 = (xj1_fit.-xj1).^2 #.*(xj1.>0)
+        err2 = (xj2_fit.-xj2).^2 #.*(xj2.>0)
         return mean(vcat(err1,err2))
     end
 
@@ -70,7 +70,8 @@ function compress_state() # empirical distribution
     eta_init = [20.0,1.0,1.0,-0.5,-1.0]
     eta_lower = [-20.0,-1.0,-1.0,-2.5,-3.0]
     eta_upper = [40.0,2.0,2.0,0.5,1.0]
-    res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(LBFGS()),Optim.Options(x_tol=1e-8))
+    # res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(LBFGS()),Optim.Options(x_tol=1e-8))
+    res = optimize(eta->obj(eta,data),eta_init,LBFGS(),Optim.Options(x_tol=1e-8))
     eta_opt = res.minimizer
     
 
@@ -343,7 +344,7 @@ end
 function main()
     # for i in 1:100
         GC.gc()
-        gendata(Int(rand(1:1e8)),num_of_obs = 200)
+        gendata(Int(rand(1:1e8)),num_of_obs = 1000)
         estimate_bbl()
         GC.gc()
     # end
