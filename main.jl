@@ -50,7 +50,7 @@ function compress_state(data) # empirical distribution
         S_self_2 = S[:,2]
         S_oppo_1 = S[:,3]
         S_oppo_2 = S[:,4]
-        return func_D.(eachrow(hcat(S_self_1,S_self_2)),eachrow(hcat(S_oppo_1,S_oppo_2))).*(eta[1].+ eta[2].*S_self_1.+eta[3].*S_self_2.+eta[4].*S_oppo_1.+eta[5].*S_oppo_2)
+        return func_D.(eachrow(hcat(S_self_1,S_self_2)),eachrow(hcat(S_oppo_1,S_oppo_2))).*(eta[1].+ S_self_1.+eta[2].*S_self_2.+eta[3].*S_oppo_1.+eta[4].*S_oppo_2)
     end
 
     function obj(eta,data)
@@ -63,13 +63,14 @@ function compress_state(data) # empirical distribution
         xj2_fit = npr(check_Sj, xj2, reg=locallinear, kernel=gaussiankernel)
         err1 = (xj1_fit.-xj1).^2 #.*(xj1.>0)
         err2 = (xj2_fit.-xj2).^2 #.*(xj2.>0)
+        println(eta,' ',mean(vcat(err1,err2)))
         return mean(vcat(err1,err2))
     end
     
-    eta_init = [20.0,1.0,1.0,-0.5,-1.0]
-    eta_lower = [-20.0,-1.0,-1.0,-2.5,-3.0]
-    eta_upper = [40.0,2.0,2.0,0.5,1.0]
-    res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(LBFGS()),Optim.Options(x_tol=1e-8))
+    eta_init = [20.0,1.0,-0.5,-1.0]*1.1
+    eta_lower = [0.0,0.0,-5.0,-5.0]
+    eta_upper = [100.0,2.0,5.0,5.0]
+    res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-4))
     eta_opt = res.minimizer
 
     # calculate results
@@ -102,11 +103,16 @@ function tobit_reg(X,Y_mat)    # linear regression
         rho   = coeff[size(X)[2]*2+1]
         sigma = exp(coeff[size(X)[2]*2+2])
         temp1 = (log.(y)-X*coeff[1:size(X)[2]])./sigma
-        temp2 = X*coeff[size(X)[2]+1:size(X)[2]*2]
+        temp2 = X*coeff[size(X)[2]+1:size(X)[2]*2] # Need to change this part to incorprate y
+        temp3 = temp_2 with an unknown eps term (equivalent to y)
         if (abs(rho/sigma)>=1)
             return Inf
         else
-            log_lhd = (logpdf.(Normal(),temp1).-log(sigma)+logcdf.(Normal(),(temp2+rho/sigma*temp1)/sqrt(1-(rho/sigma)^2))).*(y.>0.0)+logcdf.(Normal(),-temp2).*(y.<=0.0)
+            log_lhd = (logpdf.(Normal(),temp1).-log(sigma)+logcdf.(Normal(),(temp2+rho/sigma*temp1)/sqrt(1-(rho/sigma)^2))).*(y.>0.0)
+            # int over eps_un, a standard normal distribution
+            + (pdf.(Normal(),eps_un)./sigma.*cdf.(Normal(),-(temp3+rho/sigma*eps_un)/sqrt(1-(rho/sigma)^2)))
+            
+            .*(y.<=0.0)
             return - mean(log_lhd)
         end
     end
@@ -307,6 +313,7 @@ function estimate_bbl()  # main procedure of estimation following CCK(2019)
     GC.gc()
     raw_data = CSV.read("generated_data.csv", DataFrame)
     (check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,bas_x,gmin,gmax,eta) = compress_state(raw_data) # ,state_weight
+    @show eta
     num_of_mkt = size(check_Sa)[1]
     (pol_reg,pol_reg_alter) = policy_approx(raw_data,check_Sa,check_Sb)
         
