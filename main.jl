@@ -76,16 +76,16 @@ function compress_state() # empirical distribution
     
 
     # calculate results
-    check_Sa = check_S(eta,hcat(data.sa1,data.sa2,data.sb1,data.sb2))
-    check_Sb = check_S(eta,hcat(data.sb1,data.sb2,data.sa1,data.sa2))
-    check_Sa_prime = check_S(eta,hcat(data.sa1.+data.xa1,data.sa2.+data.xa2,data.sb1.+data.xb1,data.sb2.+data.xb2)) 
-    check_Sb_prime = check_S(eta,hcat(data.sb1.+data.xb1,data.sb2.+data.xb2,data.sa1.+data.xa1,data.sa2.+data.xa2)) 
+    check_Sa = check_S(eta_opt,hcat(data.sa1,data.sa2,data.sb1,data.sb2))
+    check_Sb = check_S(eta_opt,hcat(data.sb1,data.sb2,data.sa1,data.sa2))
+    check_Sa_prime = check_S(eta_opt,hcat(data.sa1.+data.xa1,data.sa2.+data.xa2,data.sb1.+data.xb1,data.sb2.+data.xb2)) 
+    check_Sb_prime = check_S(eta_opt,hcat(data.sb1.+data.xb1,data.sb2.+data.xb2,data.sa1.+data.xa1,data.sa2.+data.xa2)) 
 
     gmin = min(findmin(check_Sa)[1],findmin(check_Sb)[1])
     gmax = max(findmax(check_Sa)[1],findmax(check_Sb)[1])
     lin_space = LinRange(gmin,gmax,51)
     axis = diff(lin_space)/2+lin_space[1:end-1]
-    return (data,check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,axis,gmin,gmax) #,weight
+    return (data,check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,axis,gmin,gmax,eta_opt) #,weight
 end
 
 function lom_reg(check_S_prime,check_S,x) # basic method for law of motion estimation
@@ -221,7 +221,6 @@ end
 function calc_T(paras,num_of_state,num_of_mkt,rndvec,S,gmin,gmax,lom_coeff,pol_reg,pol_reg_alter,pol_reg_jk;return_full=true)
     GC.gc()
     @show paras
-    
     ## calculating Q_func
     val_0 = func_eval_order2_avg(paras,S,pol_reg,pol_reg,lom_coeff,gmax,gmin)
     val_alter = zeros(2,num_of_state,num_of_alter)
@@ -306,12 +305,12 @@ end
 
 function estimate_bbl()  # main procedure of estimation following CCK(2019)
     dt_temp = CSV.read("generated_data.csv", DataFrame)
-    paras_true = [2000.0,1000.0,100.0,50.0,20.0,1.0,1.0,-0.5,-1.0]
+    paras_true = [2000.0,1000.0,100.0,50.0]
     paras_lower = paras_true .* eps()
     paras_upper = paras_true .* 2.0
     GC.gc()
 
-    (raw_data,check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,bas_x,gmin,gmax) = compress_state() # ,state_weight
+    (raw_data,check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,bas_x,gmin,gmax,eta) = compress_state() # ,state_weight
     num_of_mkt = size(check_Sa)[1]
     (pol_reg,pol_reg_alter) = policy_approx(raw_data,check_Sa,check_Sb)
         
