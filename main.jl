@@ -44,7 +44,7 @@ function poly_transform(state_data) # transform using sieve
     return full_state
 end
 
-function compress_state() # empirical distribution
+function compress_state(data) # empirical distribution
     function check_S(eta,S)
         S_self_1 = S[:,1]
         S_self_2 = S[:,2]
@@ -65,15 +65,12 @@ function compress_state() # empirical distribution
         err2 = (xj2_fit.-xj2).^2 #.*(xj2.>0)
         return mean(vcat(err1,err2))
     end
-
-    data = CSV.read("generated_data.csv", DataFrame)
+    
     eta_init = [20.0,1.0,1.0,-0.5,-1.0]
     eta_lower = [-20.0,-1.0,-1.0,-2.5,-3.0]
     eta_upper = [40.0,2.0,2.0,0.5,1.0]
-    # res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(LBFGS()),Optim.Options(x_tol=1e-8))
-    res = optimize(eta->obj(eta,data),eta_init,LBFGS(),Optim.Options(x_tol=1e-8))
+    res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(LBFGS()),Optim.Options(x_tol=1e-8))
     eta_opt = res.minimizer
-    
 
     # calculate results
     check_Sa = check_S(eta_opt,hcat(data.sa1,data.sa2,data.sb1,data.sb2))
@@ -85,7 +82,7 @@ function compress_state() # empirical distribution
     gmax = max(findmax(check_Sa)[1],findmax(check_Sb)[1])
     lin_space = LinRange(gmin,gmax,51)
     axis = diff(lin_space)/2+lin_space[1:end-1]
-    return (data,check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,axis,gmin,gmax,eta_opt) #,weight
+    return (check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,axis,gmin,gmax,eta_opt) #,weight
 end
 
 function lom_reg(check_S_prime,check_S,x) # basic method for law of motion estimation
@@ -304,13 +301,12 @@ function calc_T(paras,num_of_state,num_of_mkt,rndvec,S,gmin,gmax,lom_coeff,pol_r
 end
 
 function estimate_bbl()  # main procedure of estimation following CCK(2019)
-    dt_temp = CSV.read("generated_data.csv", DataFrame)
     paras_true = [2000.0,1000.0,100.0,50.0]
     paras_lower = paras_true .* eps()
     paras_upper = paras_true .* 2.0
     GC.gc()
-
-    (raw_data,check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,bas_x,gmin,gmax,eta) = compress_state() # ,state_weight
+    raw_data = CSV.read("generated_data.csv", DataFrame)
+    (check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,bas_x,gmin,gmax,eta) = compress_state(raw_data) # ,state_weight
     num_of_mkt = size(check_Sa)[1]
     (pol_reg,pol_reg_alter) = policy_approx(raw_data,check_Sa,check_Sb)
         
