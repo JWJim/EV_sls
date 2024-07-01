@@ -1,14 +1,15 @@
 using Timers,Random,Sobol
 using Dates,Revise
 # Random.seed!(Dates.today() |> Dates.value)
-# using QuantEcon
+
 # Pkg.add(["Polynomials","SpecialPolynomials","Distributions","Statistics","StatsBase"])
 using DataFrames,CSV
 using LinearAlgebra
 using Polynomials,SpecialPolynomials
 using Optim,Distributions,Statistics,StatsBase
 using Base.Threads
-using CompEcon
+# using CompEcon
+using QuantEcon
 using Serialization
 using KernelEstimator
 # using Plots
@@ -18,7 +19,7 @@ include("gendata.jl") # data generating process
 # paras to be estimated
 const beta  = 0.6                    # profit discount factor
 # policy function approximation primitives
-const max_poli_order = 3
+const max_poli_order = 2
 # paras from other dataset
 const d1 = 0.0; const d2 = 20.0; const d3 = 3.0;   # demand coefficient
 function func_D(S_self,S_oppo) # charging demand
@@ -67,12 +68,16 @@ function compress_state(data) # empirical distribution
         return mean(vcat(err1,err2))
     end
     
-    eta_init = [20.0,1.0,-0.5,-1.0]*1.1
-    eta_lower = [0.0,0.0,-5.0,-5.0]
-    eta_upper = [100.0,2.0,5.0,5.0]
-    res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-4))
-    eta_opt = res.minimizer
-
+    # eta_init = [20.0,1.0,-0.5,-1.0]*1.1
+    # eta_lower = [0.0,0.0,-5.0,-5.0]
+    # eta_upper = [100.0,2.0,5.0,5.0]
+    # res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-8,iterations=999999))
+    if Optim.converged(res) == false
+        println("Compress state Not success")
+        println(res)
+    end
+    # eta_opt = res.minimizer
+    eta_opt = [20.0,1.0,-0.5,-1.0]
     # calculate results
     check_Sa = check_S(eta_opt,hcat(data.sa1,data.sa2,data.sb1,data.sb2))
     check_Sb = check_S(eta_opt,hcat(data.sb1,data.sb2,data.sa1,data.sa2))
@@ -98,37 +103,49 @@ function lom_pred(coeff,check_S,x)
     return x_poly*coeff
 end
 
-# function tobit_reg(X,Y_mat)    # linear regression
-#     function log_llh_trans(coeff,X,y)
-#         rho   = coeff[size(X)[2]*2+1]
-#         sigma = exp(coeff[size(X)[2]*2+2])
-#         temp1 = (log.(y)-X*coeff[1:size(X)[2]])./sigma
-#         temp2 = X*coeff[size(X)[2]+1:size(X)[2]*2] # Need to change this part to incorprate y
-#         temp3 = temp_2 with an unknown eps term (equivalent to y)
-#         if (abs(rho/sigma)>=1)
-#             return Inf
-#         else
-#             log_lhd = (logpdf.(Normal(),temp1).-log(sigma)+logcdf.(Normal(),(temp2+rho/sigma*temp1)/sqrt(1-(rho/sigma)^2))).*(y.>0.0)
-#             # int over eps_un, a standard normal distribution
-#             + (pdf.(Normal(),eps_un)./sigma.*cdf.(Normal(),-(temp3+rho/sigma*eps_un)/sqrt(1-(rho/sigma)^2)))
-            
-#             .*(y.<=0.0)
-#             return - mean(log_lhd)
-#         end
-#     end
+function tobit_reg(X,Y_mat)    # linear regression
+    function log_llh_trans(coeff,X,y)
+        xx = poly_transform(X)
+        xz = poly_transform(hcat(X,y))
+        rho   = coeff[size(xx)[2]+size(xz)[2]+1] # actually, this is rho*sigma
+        sigma = exp(coeff[size(xx)[2]+size(xz)[2]+2])
+        temp1 = (log.(y)-xx*coeff[1:size(xx)[2]])./sigma
+        temp2 = xz*coeff[size(xx)[2]+1:size(xx)[2]+size(xz)[2]] # Need to change this part to incorprate y
 
-#     xx = poly_transform(X)
-#     coeff_mat = zeros((size(xx)[2]*2+2,size(Y_mat)[2]))
-#     final_llh = zeros(size(Y_mat)[2])
-#     for i in 1:size(Y_mat)[2]
-#         yy = Y_mat[:,i]
-#         c_init = vcat(xx[yy.>0,:]\log.(yy[yy.>0]),xx\((yy.>0).-0.5),[0.0,0.0])
-#         res = optimize(c->log_llh_trans(c,xx,yy),c_init,NelderMead(),Optim.Options(x_tol=1e-8))
-#         coeff_mat[:,i] = res.minimizer
-#         final_llh[i] = -res.minimum
-#     end
-#     return (coeff_mat,final_llh)
-# end
+        function cond_f(eps_un)
+            xz_un = poly_transform(hcat(X,exp.(xx*coeff[1:size(xx)[2]].+eps_un)))
+            temp3 = xz_un*coeff[size(xx)[2]+1:size(xx)[2]+size(xz)[2]]
+            re = pdf.(Normal(),eps_un/sigma)./sigma.*cdf.(Normal(),-(temp3.+rho/sigma*eps_un/sigma)/sqrt(1-(rho/sigma)^2))
+            return re
+        end
+
+        if (abs(rho/sigma)>=1)
+            return Inf
+        else
+            (nodes,weights) = qnwnorm(5,0,sigma^2)
+            int_cond_f = sum(weights.*cond_f.(eachrow(nodes)))
+            log_lhd = (logpdf.(Normal(),temp1).-log(sigma)+logcdf.(Normal(),(temp2+rho/sigma*temp1)/sqrt(1-(rho/sigma)^2))).*(y.>0.0) + log.(int_cond_f).*(y.<=0.0)
+            return - mean(log_lhd)
+        end
+    end
+
+    xx = poly_transform(X)
+    coeff_mat = zeros((size(xx)[2]+size(xz)[2]+2,size(Y_mat)[2]))
+    final_llh = zeros(size(Y_mat)[2])
+    for i in 1:size(Y_mat)[2]
+        yy = Y_mat[:,i]
+        xz = poly_transform(hcat(X,yy))
+        c_init = vcat(xx[yy.>0,:]\log.(yy[yy.>0]),xz\((yy.>0).-0.5),[0.0,0.0])
+        res = optimize(c->log_llh_trans(c,X,yy),c_init,NelderMead(),Optim.Options(x_tol=1e-8,iterations=999999))
+        if Optim.converged(res) == false
+            println("Tobit reg Not success")
+            println(res)
+        end
+        coeff_mat[:,i] = res.minimizer
+        final_llh[i] = -res.minimum
+    end
+    return (coeff_mat,final_llh)
+end
 
 function tobit_pred(X,coeff_mat)  # linear prediction
     xx = poly_transform(X)
@@ -313,7 +330,6 @@ function estimate_bbl()  # main procedure of estimation following CCK(2019)
     GC.gc()
     raw_data = CSV.read("generated_data.csv", DataFrame)
     (check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,bas_x,gmin,gmax,eta) = compress_state(raw_data) # ,state_weight
-    @show eta
     num_of_mkt = size(check_Sa)[1]
     (pol_reg,pol_reg_alter) = policy_approx(raw_data,check_Sa,check_Sb)
         

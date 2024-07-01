@@ -78,9 +78,9 @@ function gendata(RNG_seed;num_of_obs=750)
         function func_V_opt(S_i,Ea_i,Eb_i)
             lower = [gmin,gmin]
             upper = [gmax,gmax]
-            res = optimize(x->func_eval_noac(x,S_i,Eb_i),lower,upper,Ea_i,Fminbox(LBFGS()))
+            res = optimize(x->func_eval_noac(x,S_i,Eb_i),lower,upper,Ea_i,Fminbox(LBFGS()),Optim.Options(x_tol=1e-8,iterations=999999))
             if Optim.converged(res) == false
-                println("Not success")
+                println("Solve model Not success")
                 println(res)
             end
             invest = res.minimizer
