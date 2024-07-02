@@ -1,15 +1,14 @@
 using Timers,Random,Sobol
 using Dates,Revise
 # Random.seed!(Dates.today() |> Dates.value)
-
 # Pkg.add(["Polynomials","SpecialPolynomials","Distributions","Statistics","StatsBase"])
 using DataFrames,CSV
 using LinearAlgebra
 using Polynomials,SpecialPolynomials
 using Optim,Distributions,Statistics,StatsBase
 using Base.Threads
-# using CompEcon
-using QuantEcon
+using CompEcon
+# using QuantEcon
 using Serialization
 using KernelEstimator
 # using Plots
@@ -134,6 +133,7 @@ function tobit_reg(X,Y_mat)    # linear regression
     end
 
     xx = poly_transform(X)
+    xz = poly_transform(hcat(X,Y_mat[:,1]))
     coeff_mat = zeros((size(xx)[2]+size(xz)[2]+2,size(Y_mat)[2]))
     final_llh = zeros(size(Y_mat)[2])
     for i in 1:size(Y_mat)[2]

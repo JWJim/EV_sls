@@ -6,5 +6,5 @@
 #SBATCH --partition=open
 module load julia
 export JULIA_NUM_THREADS=48
-julia testopt.jl
+julia main.jl
 # julia testgrid.jl
