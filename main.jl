@@ -65,8 +65,8 @@ function compress_state(data) # empirical distribution
         xj2 = vcat(data.xa2,data.xb2)
         xj1_fit = npr(check_Sj, xj1, reg=localconstant, kernel=gaussiankernel)
         xj2_fit = npr(check_Sj, xj2, reg=localconstant, kernel=gaussiankernel)
-        err1 = (xj1_fit.-xj1).^2 #.*(xj1.>0)
-        err2 = (xj2_fit.-xj2).^2 #.*(xj2.>0)
+        err1 = (xj1_fit.-xj1).^2 .*(xj1.>0)
+        err2 = (xj2_fit.-xj2).^2 .*(xj2.>0)
         println(eta,' ',mean(vcat(err1,err2)))
         return mean(vcat(err1,err2))
     end
