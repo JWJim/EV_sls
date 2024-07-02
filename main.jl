@@ -30,7 +30,7 @@ end
 
 const num_of_alter = 500
 const num_of_bootstrap = 200
-const ngq = 7
+const ngq = 5
 
 function poly_transform(state_data) # transform using sieve
     function gen_poly(mat)
@@ -71,16 +71,17 @@ function compress_state(data) # empirical distribution
         return mean(vcat(err1,err2))
     end
     
-    # eta_init = [20.0,1.0,-0.5,-1.0]*1.1
-    # eta_lower = [0.0,0.0,-5.0,-5.0]
-    # eta_upper = [100.0,2.0,5.0,5.0]
-    # res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-8,iterations=999999))
-    # if Optim.converged(res) == false
-    #     println("Compress state Not success")
-    #     println(res)
-    # end
-    # eta_opt = res.minimizer
-    eta_opt = [20.0,1.0,-0.5,-1.0]
+    eta_init = [20.0,1.0,-0.5,-1.0]*1.05
+    eta_lower = [0.0,0.0,-5.0,-5.0]
+    eta_upper = [100.0,2.0,5.0,5.0]
+    res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-8,iterations=999999))
+    if Optim.converged(res) == false
+        println("Compress state Not success")
+        println(res)
+    end
+    eta_opt = res.minimizer
+    # eta_opt = [20.0,1.0,-0.5,-1.0]
+
     # calculate results
     check_Sa = check_S(eta_opt,hcat(data.sa1,data.sa2,data.sb1,data.sb2))
     check_Sb = check_S(eta_opt,hcat(data.sb1,data.sb2,data.sa1,data.sa2))
@@ -378,7 +379,7 @@ end
 function main()
     # for i in 1:100
         GC.gc()
-        gendata(Int(rand(1:1e8)),num_of_obs = 500)
+        gendata(Int(rand(1:1e8)),num_of_obs = 200)
         estimate_bbl()
         GC.gc()
     # end
