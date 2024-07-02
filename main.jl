@@ -76,10 +76,10 @@ function compress_state(data) # empirical distribution
     # eta_lower = [0.0,0.0,-5.0,-5.0]
     # eta_upper = [100.0,2.0,5.0,5.0]
     # res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-8,iterations=999999))
-    if Optim.converged(res) == false
-        println("Compress state Not success")
-        println(res)
-    end
+    # if Optim.converged(res) == false
+    #     println("Compress state Not success")
+    #     println(res)
+    # end
     # eta_opt = res.minimizer
     eta_opt = [20.0,1.0,-0.5,-1.0]
     # calculate results
