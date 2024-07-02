@@ -22,25 +22,29 @@ const beta  = 0.6                    # profit discount factor
 const max_poli_order = 2
 # paras from other dataset
 const d1 = 0.0; const d2 = 20.0; const d3 = 3.0;   # demand coefficient
+
+global norm_factor = 10000 # global parameter
+
 function func_D(S_self,S_oppo) # charging demand
     return d1.+d2*(S_self[1]+S_oppo[1])+d3*(S_self[2]+S_oppo[2])
 end
 
 const num_of_alter = 500
 const num_of_bootstrap = 200
-  
+const ngq = 7
+
 function poly_transform(state_data) # transform using sieve
     function gen_poly(mat)
         retmat = hcat(ones(size(mat)[1]),mat)
         for i in 1:size(mat)[2]
             for j in i+1:size(mat)[2]
-                retmat = hcat(retmat,mat[:,i].*mat[:,j]./10)
+                retmat = hcat(retmat,mat[:,i].*mat[:,j])
             end
         end
         return retmat
     end
 
-    polinomial_eval = [basis(ChebyshevHermite,i).(state_data)./10^(i-1) for i in 1:max_poli_order]
+    polinomial_eval = [basis(ChebyshevHermite,i).(state_data)./norm_factor^(i-1) for i in 1:max_poli_order]
     full_state = gen_poly(reduce(hcat, polinomial_eval))
     return full_state
 end
@@ -122,7 +126,7 @@ function tobit_reg(X,Y_mat)    # linear regression
         if (abs(rho/sigma)>=1)
             return Inf
         else
-            (nodes,weights) = qnwnorm(5,0,sigma^2)
+            (nodes,weights) = qnwnorm(ngq,0,sigma^2)
             int_cond_f = sum(weights.*cond_f.(eachrow(nodes)))
             log_lhd = (logpdf.(Normal(),temp1).-log(sigma)+logcdf.(Normal(),(temp2+rho/sigma*temp1)/sqrt(1-(rho/sigma)^2))).*(y.>0.0) + log.(int_cond_f).*(y.<=0.0)
             return - mean(log_lhd)
@@ -148,11 +152,23 @@ function tobit_reg(X,Y_mat)    # linear regression
 end
 
 function tobit_pred(X,coeff_mat)  # linear prediction
-    xx = poly_transform(X)
-    temp1 = exp.(xx*coeff_mat[1:size(xx)[2],:])
-    temp2 = xx*coeff_mat[size(xx)[2]+1:2*size(xx)[2],:]
-    pred = temp1.*(temp2.>0)   
-    return pred
+    function predicted(shocks)
+        (ii,eps_un,xi_un) = (shocks...,)
+        ii = Int(ii)
+        xx = poly_transform(X)
+        y_opt = exp.(xx*coeff_mat[1:size(xx)[2],ii].+eps_un)
+        xz = poly_transform(hcat(X,y_opt))
+        Z = xz*coeff_mat[size(xx)[2]+1:size(xx)[2]+size(xz)[2],ii].+xi_un
+        pred = y_opt.*(Z.>0)   
+        return pred
+    end
+    pred = zeros(size(X)[1],size(coeff_mat)[2])
+    for i in 1:size(coeff_mat)[2]
+        rho   = coeff_mat[end-1,i] # actually, this is rho*sigma
+        sigma = exp(coeff_mat[end,i])
+        (nodes,weights) = qnwnorm(ngq,[0;0],[sigma^2;rho;;rho;1])
+        pred[:,i] = reduce(hcat,predicted.(eachrow(hcat(fill(i,size(nodes)[1]),nodes))))*weights
+    end
 end
 
 function policy_approx(data,check_Sa,check_Sb;drop_index=-1)
@@ -171,10 +187,9 @@ function policy_approx(data,check_Sa,check_Sb;drop_index=-1)
         state_data  = vcat(check_Sa,check_Sb)
         choice_data = vcat(hcat(data.xa1,data.xa2,data.xb1,data.xb2),hcat(data.xb1,data.xb2,data.xa1,data.xa2))
         (pol_reg,final_llh) = tobit_reg(state_data,choice_data)
-        randarray = randn(num_of_alter,size(pol_reg)...)
+        randarray = randn(num_of_alter,size(pol_reg)[2])
         pol_reg_alter = permutedims(repeat(pol_reg,outer=(1,1,num_of_alter)),(3,1,2))
-        pol_reg_alter .+= randarray
-
+        pol_reg_alter[:,1,:] .+= randarray
         return (pol_reg,pol_reg_alter)
     end
 end
@@ -330,6 +345,7 @@ function estimate_bbl()  # main procedure of estimation following CCK(2019)
     GC.gc()
     raw_data = CSV.read("generated_data.csv", DataFrame)
     (check_Sa,check_Sb,check_Sa_prime,check_Sb_prime,bas_x,gmin,gmax,eta) = compress_state(raw_data) # ,state_weight
+    global norm_factor = max(abs(gmin),abs(gmax))
     num_of_mkt = size(check_Sa)[1]
     (pol_reg,pol_reg_alter) = policy_approx(raw_data,check_Sa,check_Sb)
         
@@ -347,8 +363,8 @@ function estimate_bbl()  # main procedure of estimation following CCK(2019)
     
     all_state = bas_x
     num_of_state = size(all_state)[1]
-
     rndvec = randn(num_of_bootstrap*2,num_of_mkt)
+
     calc_T(paras_true,rndvec,return_full=true)
     for i in 0.1:0.1:2.0
         GC.gc()
@@ -362,7 +378,7 @@ end
 function main()
     # for i in 1:100
         GC.gc()
-        gendata(Int(rand(1:1e8)),num_of_obs = 1000)
+        gendata(Int(rand(1:1e8)),num_of_obs = 500)
         estimate_bbl()
         GC.gc()
     # end
