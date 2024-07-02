@@ -365,7 +365,7 @@ function estimate_bbl()  # main procedure of estimation following CCK(2019)
     num_of_state = size(all_state)[1]
     rndvec = randn(num_of_bootstrap*2,num_of_mkt)
 
-    calc_T(paras_true,rndvec,return_full=true)
+    calc_T(paras_true,num_of_state,num_of_mkt,rndvec,all_state,gmin,gmax,lom_coeff,pol_reg,pol_reg_alter,pol_reg_jk,return_full=true)
     for i in 0.1:0.1:2.0
         GC.gc()
         paras_test = copy(paras_true) * i
