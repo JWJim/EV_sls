@@ -71,16 +71,16 @@ function compress_state(data) # empirical distribution
         return mean(vcat(err1,err2))
     end
     
-    eta_init = [20.0,1.0,-0.5,-1.0]*1.05
-    eta_lower = [0.0,0.0,-5.0,-5.0]
-    eta_upper = [100.0,2.0,5.0,5.0]
-    res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-2,iterations=999999))
-    if Optim.converged(res) == false
-        println("Compress state Not success")
-        println(res)
-    end
-    eta_opt = res.minimizer
-    # eta_opt = [20.0,1.0,-0.5,-1.0]
+    # eta_init = [20.0,1.0,-0.5,-1.0]*1.05
+    # eta_lower = [0.0,0.0,-5.0,-5.0]
+    # eta_upper = [100.0,2.0,5.0,5.0]
+    # res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-2,iterations=999999))
+    # if Optim.converged(res) == false
+    #     println("Compress state Not success")
+    #     println(res)
+    # end
+    # eta_opt = res.minimizer
+    eta_opt = [20.0,1.0,-0.5,-1.0]
 
     # calculate results
     check_Sa = check_S(eta_opt,hcat(data.sa1,data.sa2,data.sb1,data.sb2))
@@ -163,13 +163,15 @@ function tobit_pred(X,coeff_mat)  # linear prediction
         pred = y_opt.*(Z.>0)   
         return pred
     end
-    pred = zeros(size(X)[1],size(coeff_mat)[2])
+    pred_re = zeros(size(X)[1],size(coeff_mat)[2])
     for i in 1:size(coeff_mat)[2]
         rho   = coeff_mat[end-1,i] # actually, this is rho*sigma
         sigma = exp(coeff_mat[end,i])
         (nodes,weights) = qnwnorm(ngq,[0;0],[sigma^2;rho;;rho;1])
-        pred[:,i] = reduce(hcat,predicted.(eachrow(hcat(fill(i,size(nodes)[1]),nodes))))*weights
+        avg_pred_i = reduce(hcat,predicted.(eachrow(hcat(fill(i,size(nodes)[1]),nodes))))*weights
+        pred_re[:,i] = avg_pred_i
     end
+    return pred_re
 end
 
 function policy_approx(data,check_Sa,check_Sb;drop_index=-1)
@@ -209,9 +211,9 @@ function func_eval_order2_avg(paras,S,pol_reg,pol_reg_alter,lom_coeff,gmax,gmin)
     function func_eval_order2(nu,nu_next)
         # period 1
         invest_alter = tobit_pred(S,pol_reg_alter)
-        invest_alter[invest_alter.>2*gmax] .= 2*gmax
+        invest_alter[invest_alter.>gmax] .= gmax
         invest_real = tobit_pred(S,pol_reg)
-        invest_real[invest_real.>2*gmax] .= 2*gmax
+        invest_real[invest_real.>gmax] .= gmax
         a_p = invest_alter[:,1:2]
         Eb  = invest_real[:,3:end]
         b_p = invest_alter[:,3:end]
@@ -221,9 +223,9 @@ function func_eval_order2_avg(paras,S,pol_reg,pol_reg_alter,lom_coeff,gmax,gmin)
         S_next1[S_next1.>gmax] .= gmax ### ????
         S_next1[S_next1.<gmin] .= gmin
         invest_alter_next1 = tobit_pred(S_next1,pol_reg_alter)
-        invest_alter_next1[invest_alter_next1.>2*gmax] .= 2*gmax
+        invest_alter_next1[invest_alter_next1.>gmax] .= gmax
         invest_real_next1 = tobit_pred(S_next1,pol_reg)
-        invest_real_next1[invest_real_next1.>2*gmax] .= 2*gmax
+        invest_real_next1[invest_real_next1.>gmax] .= gmax
         a_p_next = invest_alter_next1[:,1:2]
         Eb_next = invest_real_next1[:,3:end]
         S_next1_next = lom_pred(lom_coeff,S_next1,hcat(a_p_next,Eb_next))
@@ -235,9 +237,9 @@ function func_eval_order2_avg(paras,S,pol_reg,pol_reg_alter,lom_coeff,gmax,gmin)
         S_next2[S_next2.>gmax] .= gmax
         S_next2[S_next2.<gmin] .= gmin
         invest_alter_next2 = tobit_pred(S_next2,pol_reg_alter)
-        invest_alter_next2[invest_alter_next2.>2*gmax] .= 2*gmax
+        invest_alter_next2[invest_alter_next2.>gmax] .= gmax
         invest_real_next2 = tobit_pred(S_next2,pol_reg)
-        invest_real_next2[invest_real_next2.>2*gmax] .= 2*gmax
+        invest_real_next2[invest_real_next2.>gmax] .= gmax
         b_p_next = invest_alter_next2[:,3:end]
         Ea_next  = invest_real_next2[:,1:2]
         S_next2_next = lom_pred(lom_coeff,S_next2,hcat(b_p_next,Ea_next))
