@@ -54,7 +54,7 @@ function compress_state(data) # empirical distribution
         S_self_2 = S[:,2]
         S_oppo_1 = S[:,3]
         S_oppo_2 = S[:,4]
-        return func_D.(eachrow(hcat(S_self_1,S_self_2)),eachrow(hcat(S_oppo_1,S_oppo_2))).*(eta[1]+eta[2].*S_self_1.+eta[3].*S_self_2.+eta[4].*S_oppo_1.+eta[5].*S_oppo_2)
+        return func_D.(eachrow(hcat(S_self_1,S_self_2)),eachrow(hcat(S_oppo_1,S_oppo_2))).*(eta[1].+eta[2].*S_self_1.+eta[3].*S_self_2.+eta[4].*S_oppo_1.+eta[5].*S_oppo_2)
     end
 
     function obj(eta,data)
