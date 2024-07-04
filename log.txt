@@ -1,0 +1,2 @@
+Time used:183.733227197
+Num of threads32
