@@ -54,7 +54,7 @@ function compress_state(data) # empirical distribution
         S_self_2 = S[:,2]
         S_oppo_1 = S[:,3]
         S_oppo_2 = S[:,4]
-        return func_D.(eachrow(hcat(S_self_1,S_self_2)),eachrow(hcat(S_oppo_1,S_oppo_2))).*(eta[1].+ S_self_1.+eta[2].*S_self_2.+eta[3].*S_oppo_1.+eta[4].*S_oppo_2)
+        return func_D.(eachrow(hcat(S_self_1,S_self_2)),eachrow(hcat(S_oppo_1,S_oppo_2))).*(S_self_1.+eta[1].*S_self_2.+eta[2].*S_oppo_1.+eta[3].*S_oppo_2)
     end
 
     function obj(eta,data)
@@ -71,16 +71,16 @@ function compress_state(data) # empirical distribution
         return mean(vcat(err1,err2))
     end
     
-    eta_init = [20.0,1.0,-0.5,-1.0]*1.01
-    eta_lower = [0.0,0.0,-5.0,-5.0]
-    eta_upper = [100.0,2.0,5.0,5.0]
+    eta_init = [1.0,-0.5,-1.0]*1.01
+    eta_lower = [0.0,-5.0,-5.0]
+    eta_upper = [2.0,5.0,5.0]
     res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-2,iterations=999999))
     if Optim.converged(res) == false
         println("Compress state Not success")
         println(res)
     end
     eta_opt = res.minimizer
-    # eta_opt = [20.0,1.0,-0.5,-1.0]
+    # eta_opt = [1.0,-0.5,-1.0]
 
     # calculate results
     check_Sa = check_S(eta_opt,hcat(data.sa1,data.sa2,data.sb1,data.sb2))
@@ -372,7 +372,6 @@ function estimate_bbl()  # main procedure of estimation following CCK(2019)
     for i in 0.1:0.1:2.0
         GC.gc()
         paras_test = copy(paras_true) * i
-        paras_test[5:7] = copy(paras_true)[5:7]
         calc_T(paras_test,num_of_state,num_of_mkt,rndvec,all_state,gmin,gmax,lom_coeff,pol_reg,pol_reg_alter,pol_reg_jk,return_full=true)
     end
     return 0
@@ -381,7 +380,7 @@ end
 function main()
     # for i in 1:100
         GC.gc()
-        gendata(Int(rand(1:1e8)),num_of_obs = 200)
+        gendata(Int(rand(1:1e8)),num_of_obs = 500)
         estimate_bbl()
         GC.gc()
     # end
