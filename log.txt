@@ -1,8 +1,0 @@
-Time used:145.802284914
-Num of threads32
-Time used:145.019217387
-Num of threads32
-Time used:159.197958917
-Num of threads32
-Time used:162.790911129
-Num of threads32

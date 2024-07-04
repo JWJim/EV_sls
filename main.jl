@@ -18,7 +18,7 @@ include("gendata.jl") # data generating process
 # paras to be estimated
 const beta  = 0.6                    # profit discount factor
 # policy function approximation primitives
-const max_poli_order = 2
+const max_poli_order = 3
 # paras from other dataset
 const d1 = 0.0; const d2 = 20.0; const d3 = 3.0;   # demand coefficient
 
@@ -54,7 +54,7 @@ function compress_state(data) # empirical distribution
         S_self_2 = S[:,2]
         S_oppo_1 = S[:,3]
         S_oppo_2 = S[:,4]
-        return func_D.(eachrow(hcat(S_self_1,S_self_2)),eachrow(hcat(S_oppo_1,S_oppo_2))).*(S_self_1.+eta[1].*S_self_2.+eta[2].*S_oppo_1.+eta[3].*S_oppo_2)
+        return func_D.(eachrow(hcat(S_self_1,S_self_2)),eachrow(hcat(S_oppo_1,S_oppo_2))).*(eta[1]+eta[2].*S_self_1.+eta[3].*S_self_2.+eta[4].*S_oppo_1.+eta[5].*S_oppo_2)
     end
 
     function obj(eta,data)
@@ -65,15 +65,15 @@ function compress_state(data) # empirical distribution
         xj2 = vcat(data.xa2,data.xb2)
         xj1_fit = npr(check_Sj, xj1, reg=locallinear, kernel=gaussiankernel)
         xj2_fit = npr(check_Sj, xj2, reg=locallinear, kernel=gaussiankernel)
-        err1 = (xj1_fit.-xj1).^2 .*(xj1.>0)
-        err2 = (xj2_fit.-xj2).^2 .*(xj2.>0)
+        err1 = (xj1_fit.-xj1).^2 #.*(xj1.>0)
+        err2 = (xj2_fit.-xj2).^2 #.*(xj2.>0)
         println(eta,' ',mean(vcat(err1,err2)))
         return mean(vcat(err1,err2))
     end
     
-    eta_init = [1.0,-0.5,-1.0]*1.01
-    eta_lower = [0.0,-5.0,-5.0]
-    eta_upper = [2.0,5.0,5.0]
+    eta_init = [20.0,1.0,1.0,-0.5,-1.0]*1.01
+    eta_lower = [0.0,0.0,0.0,-5.0,-5.0]
+    eta_upper = [100.0,2.0,2.0,5.0,5.0]
     res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-2,iterations=999999))
     if Optim.converged(res) == false
         println("Compress state Not success")
@@ -380,7 +380,7 @@ end
 function main()
     # for i in 1:100
         GC.gc()
-        gendata(Int(rand(1:1e8)),num_of_obs = 500)
+        gendata(Int(rand(1:1e8)),num_of_obs = 800)
         estimate_bbl()
         GC.gc()
     # end
