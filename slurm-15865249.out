@@ -1,0 +1,45 @@
+ERROR: LoadError: MethodError: no method matching ^(::Vector{Float64}, ::Int64)
+Closest candidates are:
+  ^(!Matched::Union{AbstractChar, AbstractString}, ::Integer) at strings/basic.jl:730
+  ^(!Matched::AbstractPolynomial, ::Integer) at ~/.julia/packages/Polynomials/1aa8e/src/common.jl:625
+  ^(!Matched::UniformScaling, ::Number) at /storage/icds/RISE/sw8/julia-1.8.1/julia-1.8.1/share/julia/stdlib/v1.8/LinearAlgebra/src/uniformscaling.jl:317
+  ...
+Stacktrace:
+  [1] (::var"#36#40"{Vector{Float64}})(i::Int64)
+    @ Main ./none:0
+  [2] iterate
+    @ ./generator.jl:47 [inlined]
+  [3] collect(itr::Base.Generator{UnitRange{Int64}, var"#36#40"{Vector{Float64}}})
+    @ Base ./array.jl:787
+  [4] (::var"#obj#39"{var"#check_S#38"})(eta::Vector{Float64}, data::DataFrame)
+    @ Main ~/2024summer/EV_sls/main.jl:68
+  [5] #37
+    @ ~/2024summer/EV_sls/main.jl:83 [inlined]
+  [6] finite_difference_gradient!(df::Vector{Float64}, f::var"#37#41"{DataFrame, var"#obj#39"{var"#check_S#38"}}, x::Vector{Float64}, cache::DiffEqDiffTools.GradientCache{Nothing, Nothing, Nothing, Val{:central}, Float64, Val{true}}; relstep::Float64, absstep::Float64, dir::Bool)
+    @ DiffEqDiffTools ~/.julia/packages/DiffEqDiffTools/91LlG/src/gradients.jl:310
+  [7] finite_difference_gradient!
+    @ ~/.julia/packages/DiffEqDiffTools/91LlG/src/gradients.jl:251 [inlined]
+  [8] (::NLSolversBase.var"#g!#15"{var"#37#41"{DataFrame, var"#obj#39"{var"#check_S#38"}}, DiffEqDiffTools.GradientCache{Nothing, Nothing, Nothing, Val{:central}, Float64, Val{true}}})(storage::Vector{Float64}, x::Vector{Float64})
+    @ NLSolversBase ~/.julia/packages/NLSolversBase/NsXIC/src/objective_types/oncedifferentiable.jl:56
+  [9] gradient!!(obj::OnceDifferentiable{Float64, Vector{Float64}, Vector{Float64}}, x::Vector{Float64})
+    @ NLSolversBase ~/.julia/packages/NLSolversBase/NsXIC/src/interface.jl:63
+ [10] gradient!
+    @ ~/.julia/packages/NLSolversBase/NsXIC/src/interface.jl:51 [inlined]
+ [11] optimize(df::OnceDifferentiable{Float64, Vector{Float64}, Vector{Float64}}, l::Vector{Float64}, u::Vector{Float64}, initial_x::Vector{Float64}, F::Fminbox{NelderMead{Optim.AffineSimplexer, Optim.AdaptiveParameters}, Float64, Optim.var"#39#41"}, options::Optim.Options{Float64, Nothing})
+    @ Optim ~/.julia/packages/Optim/TNmSw/src/multivariate/solvers/constrained/fminbox.jl:230
+ [12] optimize(f::Function, l::Vector{Float64}, u::Vector{Float64}, initial_x::Vector{Float64}, F::Fminbox{NelderMead{Optim.AffineSimplexer, Optim.AdaptiveParameters}, Float64, Optim.var"#39#41"}, options::Optim.Options{Float64, Nothing}; inplace::Bool, autodiff::Symbol)
+    @ Optim ~/.julia/packages/Optim/TNmSw/src/multivariate/solvers/constrained/fminbox.jl:176
+ [13] optimize
+    @ ~/.julia/packages/Optim/TNmSw/src/multivariate/solvers/constrained/fminbox.jl:168 [inlined]
+ [14] compress_state(data::DataFrame)
+    @ Main ~/2024summer/EV_sls/main.jl:83
+ [15] estimate_bbl()
+    @ Main ~/2024summer/EV_sls/main.jl:356
+ [16] main()
+    @ Main ~/2024summer/EV_sls/main.jl:390
+ [17] top-level scope
+    @ ~/2024summer/EV_sls/main.jl:395
+in expression starting at /storage/home/jpw6255/2024summer/EV_sls/main.jl:395
+126.263497 seconds (2.28 G allocations: 146.360 GiB, 81.55% gc time, 4.60% compilation time: 1% of which was recompilation)
+ 58.872520 seconds (1.08 G allocations: 69.607 GiB, 86.77% gc time, 0.73% compilation time)
+Time elapsed: 187.627213233 s

@@ -32,11 +32,19 @@ function gendata(RNG_seed;num_of_obs=750)
     phi = funbase(basis)
     
     function func_D(S_self,S_oppo) # charging demand
-        return d2*20.0+d3*10.0
+        return d1.+d2*(S_self[1]+S_oppo[1])+d3*(S_self[2]+S_oppo[2])
     end
     
+    function func_T_reduced(S_self_s,S_oppo_s,locisrural)
+        if locisrural == 0
+            re = gmax .+ S_self_s .- gamma[1]*S_oppo_s
+        else
+            re = gmax .+ S_self_s .- gamma[2]*S_oppo_s
+        end
+        return re
+    end
     function func_revenue(S_self,S_oppo) # revenue function
-        return func_D(S_self,S_oppo).*(gmax.+gmax.+S_self[1].-gamma[1]*S_oppo[1]+S_self[2].-gamma[2]*S_oppo[2])
+        return func_D(S_self,S_oppo).*func_T_reduced(S_self[1],S_oppo[1],0).+func_D(S_self,S_oppo).*func_T_reduced(S_self[2],S_oppo[2],1)
     end
     function func_cost_wac(a)
         return 0.5*vc[1]*((a[1]).^2).+0.5*vc[2]*((a[2]).^2)+ac[1]*(a[1].>0.0) + ac[2]*(a[2].>0.0)
