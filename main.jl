@@ -67,15 +67,15 @@ function compress_state(data) # empirical distribution
         xj2 = vcat(data.xa2,data.xb2)
         norm_fact = mean(check_Sj)
 
-        # check_Sj_poly = reduce(hcat,[basis(ChebyshevHermite,i).(check_Sj)./(norm_fact^i) for i in 0:5])
-        # M = I-check_Sj_poly*pinv(check_Sj_poly'*check_Sj_poly)*check_Sj_poly'
-        # err1 = (M*xj1).^2 #.*(xj1.>0)
-        # err2 = (M*xj2).^2 #.*(xj2.>0)
+        check_Sj_poly = reduce(hcat,[basis(ChebyshevHermite,i).(check_Sj)./(norm_fact^i) for i in 0:5])
+        M = I-check_Sj_poly*pinv(check_Sj_poly'*check_Sj_poly)*check_Sj_poly'
+        err1 = (M*xj1).^2 #.*(xj1.>0)
+        err2 = (M*xj2).^2 #.*(xj2.>0)
 
-        xj1_fit = npr(check_Sj, xj1, reg=locallinear, kernel=gaussiankernel)
-        xj2_fit = npr(check_Sj, xj2, reg=locallinear, kernel=gaussiankernel)
-        err1 = (xj1_fit.-xj1).^2 #.*(xj1.>0)
-        err2 = (xj2_fit.-xj2).^2 #.*(xj2.>0)
+        # xj1_fit = npr(check_Sj, xj1, reg=locallinear, kernel=gaussiankernel)
+        # xj2_fit = npr(check_Sj, xj2, reg=locallinear, kernel=gaussiankernel)
+        # err1 = (xj1_fit.-xj1).^2 #.*(xj1.>0)
+        # err2 = (xj2_fit.-xj2).^2 #.*(xj2.>0)
         println(eta,' ',sum(vcat(err1,err2)))
         return mean(vcat(err1,err2))
     end
@@ -351,7 +351,7 @@ function calc_T(paras,num_of_state,num_of_mkt,rndvec,S,gmin,gmax,lom_coeff,pol_r
 end
 
 function estimate_bbl()  # main procedure of estimation following CCK(2019)
-    paras_true = [2000.0,1000.0,100.0,50.0]
+    paras_true = [200.0,100.0,10.0,5.0]
     paras_lower = paras_true .* eps()
     paras_upper = paras_true .* 2.0
     GC.gc()

@@ -12,3 +12,5 @@ Time used:83.0442392
 Num of threads16
 Time used:78.4672086
 Num of threads16
+Time used:174.322205335
+Num of threads32
