@@ -16,10 +16,10 @@ function gendata(RNG_seed;num_of_obs=750)
     # Globals
     ## globals
     # paras to be estimated
-    vc    = [2000.0,1000.0];              # quadratic investment cost
-    ac    = [100.0,50.0];                   # fixed cost
+    vc    = [200.0,100.0];              # quadratic investment cost
+    ac    = [10.0,5.0];                   # fixed cost
     beta  = 0.6;                      # profit discount factor
-    gamma = [0.5,1.0];              # reduced form
+    gamma = [0.025,0.05];              # reduced form
     # paras from other dataset
     d1 = 0.0; d2 = 20.0; d3 = 3.0;   # demand coefficient
     
@@ -32,11 +32,11 @@ function gendata(RNG_seed;num_of_obs=750)
     phi = funbase(basis)
     
     function func_D(S_self,S_oppo) # charging demand
-        return d2*20.0+d3*10.0
+        return d2*10.0+d3*10.0
     end
     
     function func_revenue(S_self,S_oppo) # revenue function
-        return func_D(S_self,S_oppo).*(gmax.+gmax.+S_self[1].-gamma[1]*S_oppo[1]+S_self[2].-gamma[2]*S_oppo[2])
+        return func_D(S_self,S_oppo).*(S_self[1].*(1.0.-gamma[1]*S_oppo[1]).+S_self[2].*(1.0.-gamma[2]*S_oppo[2]))
     end
     function func_cost_wac(a)
         return 0.5*vc[1]*((a[1]).^2).+0.5*vc[2]*((a[2]).^2)+ac[1]*(a[1].>0.0) + ac[2]*(a[2].>0.0)

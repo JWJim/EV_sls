@@ -55,7 +55,7 @@ function compress_state(data) # empirical distribution
         S_oppo_1 = S[:,3]
         S_oppo_2 = S[:,4]
         # return func_D.(eachrow(hcat(S_self_1,S_self_2)),eachrow(hcat(S_oppo_1,S_oppo_2))).*(eta[1].+eta[2].*S_self_1.+eta[3].*S_self_2.+eta[4].*S_oppo_1.+eta[5].*S_oppo_2)
-        return eta[1].+S_self_1.+eta[2].*S_self_2.+eta[3].*S_oppo_1.+eta[4].*S_oppo_2
+        return S_self_1.+eta[1].*S_self_2.+eta[2].*S_oppo_1.*S_self_1.+eta[3].*S_oppo_2.*S_self_2
         
     end
 
@@ -65,21 +65,24 @@ function compress_state(data) # empirical distribution
         check_Sj = vcat(check_Sa,check_Sb)
         xj1 = vcat(data.xa1,data.xb1)
         xj2 = vcat(data.xa2,data.xb2)
-        check_Sj_poly = [basis(ChebyshevHermite,i).(check_Sj)./(check_Sj^i) for i in 0:5]
-        M = I-check_Sj_poly*pinv(check_Sj_poly'*check_Sj_poly)*check_Sj_poly'
-        # xj1_fit = npr(check_Sj, xj1, reg=locallinear, kernel=gaussiankernel)
-        # xj2_fit = npr(check_Sj, xj2, reg=locallinear, kernel=gaussiankernel)
-        err1 = (M*xj1).^2 #.*(xj1.>0)
-        err2 = (M*xj2).^2 #.*(xj2.>0)
-        # err1 = (xj1_fit.-xj1).^2 #.*(xj1.>0)
-        # err2 = (xj2_fit.-xj2).^2 #.*(xj2.>0)
-        println(eta,' ',mean(vcat(err1,err2)))
+        norm_fact = mean(check_Sj)
+
+        # check_Sj_poly = reduce(hcat,[basis(ChebyshevHermite,i).(check_Sj)./(norm_fact^i) for i in 0:5])
+        # M = I-check_Sj_poly*pinv(check_Sj_poly'*check_Sj_poly)*check_Sj_poly'
+        # err1 = (M*xj1).^2 #.*(xj1.>0)
+        # err2 = (M*xj2).^2 #.*(xj2.>0)
+
+        xj1_fit = npr(check_Sj, xj1, reg=locallinear, kernel=gaussiankernel)
+        xj2_fit = npr(check_Sj, xj2, reg=locallinear, kernel=gaussiankernel)
+        err1 = (xj1_fit.-xj1).^2 #.*(xj1.>0)
+        err2 = (xj2_fit.-xj2).^2 #.*(xj2.>0)
+        println(eta,' ',sum(vcat(err1,err2)))
         return mean(vcat(err1,err2))
     end
     
-    eta_init = [20.0,1.0,-0.5,-1.0]*1.01
-    eta_lower = [0.0,0.0,-5.0,-5.0]
-    eta_upper = [100.0,2.0,5.0,5.0]
+    eta_init = [1.0,-0.025,-0.05]*1.01
+    eta_lower = [0.0,-0.5,-0.5]
+    eta_upper = [2.0,0.5,0.5]
     res = optimize(eta->obj(eta,data),eta_lower,eta_upper,eta_init,Fminbox(NelderMead()),Optim.Options(x_tol=1e-8,iterations=999999))
     if Optim.converged(res) == false
         println("Compress state Not success")
